@@ -6,10 +6,28 @@
 # It can be obtained at https://archive.ics.uci.edu/ml/datasets/Sales_Transactions_Dataset_Weekly
 
 def initialize_means(x, k):
-# Means are initialized by randomly selecting k samples from data.
+# Mean initialization based on the k-means++ algorithm.
 
-    indices = np.random.choice(x.shape[0], size = k, replace = False)
-    means = x[indices,:]
+    # First cluster centroid is selected randomly.
+    index = np.random.randint(x.shape[0])
+    means = x[index,:].reshape(1,-1)
+
+    # Remaining centroids are to be calculated in this loop.
+    for _ in range(1,k):
+        maxDist = 0
+
+        for j in range(x.shape[0]):
+            
+            # The distance to the closest centroid for each data sample is calculated.
+            Dist = np.min(np.sum((means - x[j,:])**2, axis = 1))
+
+            # The largest distance and the corresponding index are stored
+            if Dist > maxDist:
+                maxDist = Dist
+                index = j
+            
+        # The data point of the largest distance is saved as the next centroid.
+        means = np.vstack((means, x[index,:].reshape(1,-1)))
 
     return means
 
@@ -19,16 +37,15 @@ def closest_mean(x, means):
 
     idx = []
     for i in range(x.shape[0]):
-        id = np.argmin(np.sum((means - x[i,:])**2, axis = 1))
-        idx.append(id)
+        idx.append( np.argmin(np.sum((means - x[i,:])**2, axis = 1)) )
 
-    return idx
+    return np.array(idx)
 
 def calculate_means(x, idx, means):
 # Calculates the new means for each ID of clusters.
 
     for i in range(means.shape[0]):
-        means[i,:] = np.sum(x[np.array(idx) == i,:], axis = 0) / np.sum(np.array(idx) == i)
+        means[i,:] = np.sum(x[idx == i,:], axis = 0) / np.sum(idx == i)
 
     return means
 
@@ -41,41 +58,31 @@ def error_function(x, idx, means):
 
     return (1 / x.shape[0]) * E
 
-def k_means(x, k = 8, trials = 20, max_iter=100, tol=0.000001):
+def k_means(x, k = 8, max_iter=100, tol=0.00001):
 # K-Means function.
 # For the chance of finding a local optima, it gets run for several times (trials).
 
-    errors = []
-    IDX = []
-    for i in range(trials):
-        means = initialize_means(x, k)
+    means = initialize_means(x, k)
+    E = 100_000_000 # An arbitrary big number
+
+    for j in range(max_iter):
         idx = closest_mean(x, means)
-        E = error_function(x, idx, means)
+        means = calculate_means(x, idx, means)
+        E_ = error_function(x, idx, means)
 
-        for j in range(max_iter):
-            idx = closest_mean(x, means)
-            means = calculate_means(x, idx, means)
-            E_update = error_function(x, idx, means)
+        # If the update of error is not significant, loop gets stopped.
+        if E - E_ < tol:
+            break
+        else:
+            E = E_
 
-            # If the update of error is not significant, loop gets stopped.
-            if (E - E_update) < tol:
-                break
-            else:
-                E = E_update
-
-        # Error and IDs are stored to pick ones with the lowest error later.
-        errors.append(E_update)
-        IDX.append(idx)
-
-    return IDX[np.argmin(errors)]
+    return idx, means
 
 import pandas as pd
 import numpy as np
 
 data = pd.read_csv('Sales_Transactions_Dataset_Weekly.csv')
+x = data.to_numpy()[:,1:53].astype(dtype = 'float')
 
-# Dataset provides normalized data.
-x = data.filter(regex='Normalized').to_numpy()
-
-# Input data is sent to the model to get the cluster ids.
-idx = k_means(x)
+# Data is sent to the model to get the cluster ids and cluster centroids.
+idx, means = k_means(x)
