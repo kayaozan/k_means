@@ -19,8 +19,30 @@ x = data.filter(regex='Normalized')
 # The number of dimensions is reduced into 2D for visualization.
 x = PCA(2).fit_transform(x)
 
-# K-Means is initialized and trained.
-kmeans = KMeans(n_clusters=8, random_state=0, n_init="auto")
+
+#####
+# This section is used to determine the optimum k value.
+# Comment the lines to skip it.
+inertiaAll = []
+K = range(1,10)
+for k in K:
+    # Model is trained for several k values.
+    kmeans = KMeans(n_clusters = k, random_state=0, n_init="auto")
+    _ = kmeans.fit_predict(x)
+
+    # Inertia (Sum of Squares) is stored for comparison.
+    inertiaAll.append(kmeans.inertia_)
+
+# Inertia is plotted against k values to get the elbow analysis.
+plt.plot(K, inertiaAll)
+plt.xlabel('k values')
+plt.ylabel('Inertia')
+plt.show()
+#####
+
+
+# K-Means is initialized and trained with optimum k value.
+kmeans = KMeans(n_clusters = 3, random_state=0, n_init="auto")
 ids = kmeans.fit_predict(x)
 
 # Labels and cluster centers are obtained.
@@ -31,6 +53,6 @@ centroids = kmeans.cluster_centers_
 for i in u_ids:
     plt.scatter(x[ids == i , 0] , x[ids == i , 1] , label = i)
 
-plt.scatter(centroids[:,0] , centroids[:,1] , s = 100, color = 'k')
+plt.scatter(centroids[:,0] , centroids[:,1] , s = 100, color = 'black')
 plt.legend()
 plt.show()
